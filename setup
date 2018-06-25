@@ -1,0 +1,288 @@
+#!Python
+
+#### removed on devices without libraries
+from __future__ import division
+import time
+import Adafruit_PCA9685
+
+
+#### Initialise the PCA9685 using the default address (0x40).
+#### must define L left and R right IIC channels
+Lpwm = Adafruit_PCA9685.PCA9685()
+Rpwm = Adafruit_PCA9685.PCA9685(0x41)
+
+def set_servo_pulse(channel, pulse):
+    pulse_length = 1000000    # 1,000,000 us per second
+    pulse_length //= 60       # 60 Hz
+    print('{0}us per period'.format(pulse_length))
+    pulse_length //= 4096     # 12 bits of resolution
+    print('{0}us per bit'.format(pulse_length))
+    pulse *= 1000
+    pulse //= pulse_length
+    pwm.set_pwm(channel, 0, pulse)
+
+#### Set frequency to 60hz, good for servos.
+Lpwm.set_pwm_freq(60)
+Rpwm.set_pwm_freq(60)
+
+import os
+import pickle
+positions = []
+global legs
+global servoStat
+global tempLegs
+servoStat = [[0 for x in range(16)] for y in range(2)]
+legs = [[[0 for x in range(3)] for y in range(16)] for z in range(2)] #-first time
+legs = pickle.load(open("legs.pickle", "rb"))
+tempLegs = [[0 for x in range(16)] for y in range(2)] #-first time
+#tempLegs = pickle.load(open("tempLegs.pickle", "rb"))
+index = []
+global q
+q = False
+
+def displayHelp():
+    print("-----------Position settings--------")
+    print("Options     Driver    Servo    Position     Amount")
+    print("")
+    print("-w    | write possition to the matrix")
+    print("        -w <driver> <servo> <position> <amount>")
+    print("")
+    print("-m    | moves servo")
+    print("        -m <driver> <servo> <position> <amount>")
+    print("")
+    print("--------Single Option Menu----------------")
+    print("-obo  <num servos> | cycles through n number of servos on each board")
+    print("-OBO  <position>   | moves values from obo to main var")
+    print("-SA   <position>   | set all servos position ammount")
+    print("-MA   <position>   | moves all servos to position")
+    print("")
+    print("--------non value options---------")
+    print("-c <number servos> cycle through min med and max values of legs")
+    print("-d displays position and active servos")
+    print("-s save the legs matrix to pickle file for later use")
+    print("-z zero all servos")
+    
+
+def getCommands(text):
+    x = ""
+    c = 0
+    commands = []
+    print('len ', len(text))
+    for i in text:
+        if i != " ":
+            x = x + i
+        if c == (len(text)-1) or i == " ":
+            commands.append(x)
+            x = ""
+        c += 1
+    return commands
+
+def parseCommands(c):
+    global q
+    global legs
+    global tempLegs
+    i = 0
+    if "-obo" in c:
+        i = c.index("-obo")
+        try:
+            tempLegs = oneByOne(int(c[i+1]))
+        except:
+            print("need to add number of servos")
+            print(" -obo <num_servos_on_each_driver_to_itterate_through>")
+    elif "-OBO" in c:
+        i = c.index("-OBO")
+        try:
+            oBO(int(c[i+1]))
+        except:
+            print("writes values from -obo to the main legs var")
+            print("-OBO <position> to write to in legs 0,1,2")
+    elif "-w" in c:
+        i = c.index("-w")
+        try:
+            writeLegs(int(c[i+1]),int(c[i+2]),int(c[i+3]),int(c[i+4]))
+        except:
+            print("not enough arguments given or too many")
+            print("-w <driver> <servo> <position> <amount>")
+    elif "-m" in c:
+        i = c.index("-m")
+        try:
+            moveLegs(int(c[i+1]),int(c[i+2]),int(c[i+3]),int(c[i+4]))
+        except:
+            print("not enough arguments given or too many")
+            print("-m <driver> <servo> <position> <amount>")
+    elif "-d" in c:
+        i = c.index("-d")
+        displayLegs()
+    elif "-s" in c:
+        pickle.dump(legs, open("legs.pickle","wb"))
+        pickle.dump(tempLegs, open("tempLegs.pickle","wb"))
+        print("saved to file legs.pickle")
+    elif "-SA" in c:
+        try:
+            setAll(int(c[i+1]),int(c[i+2])) # position ammount
+        except:
+            print("not enough arguments given or too many")
+            print("-SA <position> <amount>")
+    elif "-MA" in c:
+        try:
+            moveAll(int(c[i+1]))
+        except:
+            print("-MA <position>")
+    elif "-q" in c:
+        q = True
+    elif "-c" in c:
+        i = c.index("-c")
+        try:
+            cycleServos(c[i+1])
+        except:
+            print("please enter number of servos to cycle through")
+    if "-z" in c:
+        zeroServos()
+    if "-h" in c:
+        displayHelp()
+    #except:
+        #print(" error may not have specified parameters ")
+        #displayHelp()
+
+def cycleServos(n):
+    global legs
+    # move from midpoint to max smoothly 225 steps
+    for i in range(225):
+        for x in range(n):
+            diffL = legs[0][x][2] - legs[0][x][1]
+            diffR = legs[1][x][2] - legs[1][x][1]
+            servoL = int((i/225)*diffL)+ legs[0][x][1]
+            servoR = int((i/225)*diffR)+ legs[1][x][1]
+            Lpwm.set_pwm(x,0,servoL)
+            Rpwm.set_pwm(x,0,servoR)
+            servoStat[0][x] = servoL
+            servoStat[1][x] = servoR
+        time.sleep(.1)
+        os.system('clear')
+        displayLegs()
+        print("Midpoint to Maximum : ", i)
+    # move from max to min smoothly 450 steps
+    for i in range(450):
+        for x in range(n):
+            diffL = legs[0][x][2] - legs[0][x][0]
+            diffR = legs[1][x][2] - legs[1][x][0]
+            servoL = legs[0][x][2] - int((i/450)*diffL) 
+            servoR = legs[1][x][2] - int((i/450)*diffR)
+            Lpwm.set_pwm(x,0,servoL)
+            Rpwm.set_pwm(x,0,servoR)
+            servoStat[0][x] = servoL
+            servoStat[1][x] = servoR
+        time.sleep(.1)
+        os.system('clear')
+        displayLegs()
+        print("Maximum to Minimum : ", i)
+    # Move from min to mid smoothly 225 steps
+    for i in range(225):
+        for x in range(n):
+            diffL = legs[0][x][1] - legs[0][x][0]
+            diffR = legs[1][x][1] - legs[1][x][0]
+            servoL = int((i/225)*diffL)+ legs[0][x][0]
+            servoR = int((i/225)*diffR)+ legs[1][x][0]
+            Lpwm.set_pwm(x,0,servoL)
+            Rpwm.set_pwm(x,0,servoR)
+            servoStat[0][x] = servoL
+            servoStat[1][x] = servoR
+        time.sleep(.1)
+        os.system('clear')
+        displayLegs()
+        print("Minimum to Midpoint : ", i)
+
+def writeLegs(d,s,p,a):
+    global legs
+    legs[d][s][p] = a
+
+def moveLegs(d,s,p,a):
+    global servoStat
+    if d == 0:
+        Lpwm.set_pwm(s,0,a)
+        servoStat[0][s] = a
+    elif d == 1:
+        Rpwm.set_pwm(s,0,a)
+        servoStat[1][s] = a
+
+# set all servos from legs var p=position, a=amount
+def setAll(p,a):
+    for i in range(len(legs[0])):
+        legs[0][i][p] = a
+        legs[1][i][p] = a
+
+def moveAll(p):
+    global legs
+    for i in range(len(legs[0])):
+        Lpwm.set_pwm(i,0,legs[0][i][p])
+        servoStat[0][i] = legs[0][i][p]
+        Rpwm.set_pwm(i,0,legs[1][i][p])
+        servoStat[1][i] = legs[1][i][p]
+        
+
+def displayLegs():
+    print('s  d0         d1')
+    for i in range(len(legs[0])):
+        print( i, legs[0][i],servoStat[0][i], legs[1][i], servoStat[1][i])
+
+def zeroServos():
+    for i in range(len(legs[0])):
+        Lpwm.set_pwm(i,0,0)
+        Rpwm.set_pwm(i,0,0)
+        servoStat[0][i] = 0
+        servoStat[1][i] = 0
+
+def oboParse(text):
+    c = getCommands(text)
+    
+
+def oneByOne(x):
+    global legs
+    global tempLegs
+    qQ = False
+    motor = 0
+    for i in range(x):
+        con = False
+        while con == False:
+            print("Set motor ", i, " on board 0 (left)")
+            motor = int(input())
+            if motor > 150 and motor < 600:
+                Lpwm.set_pwm(i,0,int(motor))
+            print("happy with the value?")
+            ip = raw_input()
+            if ip == "y":
+                tempLegs[0][i]=motor
+                con = True
+    for i in range(x):
+        con = False
+        while con == False:
+            print("Set motor ", i, " on board 1 (right)")
+            motor = int(input())
+            if motor > 150 and motor < 600:
+                Rpwm.set_pwm(i,0,int(motor))
+            print("happy with the value?")
+            ip = raw_input()
+            if ip == "y":
+                tempLegs[1][i]=motor
+                con = True
+    print(tempLegs)
+
+def oBO(p):
+    global tempLegs
+    for x in range(2):
+        for y in range(16):
+            legs[x][y][p] = tempLegs[x][y]
+                             
+        
+        
+displayHelp()
+while q != True:
+    os.system('clear')
+    print("-----------Servo-Set-Module----------")
+    print("Options     Driver    Servo    Position     Amount")
+    print("-r read, -w write, -d display, -s save")
+    print("-m move, -SA setAll, -z zero all, -obo , -OBO")
+    print("-q quit, -h for help")
+    commands=getCommands(raw_input())
+    #print(commands)
+    arguments = parseCommands(commands)
