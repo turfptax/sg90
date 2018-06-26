@@ -1,4 +1,6 @@
 #!Python
+# Linews 4-26 created by Adafruit They are amazing please support them by buying their products
+# adafruit.com especially the https://learn.adafruit.com/adafruit-16-channel-servo-driver-with-raspberry-pi
 
 #### removed on devices without libraries
 from __future__ import division
@@ -33,9 +35,7 @@ global servoStat
 global tempLegs
 servoStat = [[0 for x in range(16)] for y in range(2)]
 legs = [[[0 for x in range(3)] for y in range(16)] for z in range(2)] #-first time
-legs = pickle.load(open("legs.pickle", "rb"))
 tempLegs = [[0 for x in range(16)] for y in range(2)] #-first time
-#tempLegs = pickle.load(open("tempLegs.pickle", "rb"))
 index = []
 global q
 q = False
@@ -89,6 +89,13 @@ def parseCommands(c):
         except:
             print("need to add number of servos")
             print(" -obo <num_servos_on_each_driver_to_itterate_through>")
+    elif "-load" in c:
+        try:
+            legs = pickle.load(open("legs.pickle", "rb"))
+            templegs = pickle.load(open("templegs.pickle", "rb"))
+        except:
+            print("could not load pickle file, may be corrupt or not exist")
+            
     elif "-OBO" in c:
         i = c.index("-OBO")
         try:
@@ -236,7 +243,7 @@ def oboParse(text):
     c = getCommands(text)
     
 
-def oneByOne(x):
+def oneByOne(x): # allows tuning motors one at a time sequentially
     global legs
     global tempLegs
     qQ = False
