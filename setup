@@ -10,8 +10,8 @@ import Adafruit_PCA9685
 
 #### Initialise the PCA9685 using the default address (0x40).
 #### must define L left and R right IIC channels
-Lpwm = Adafruit_PCA9685.PCA9685()
-Rpwm = Adafruit_PCA9685.PCA9685(0x41)
+Upwm = Adafruit_PCA9685.PCA9685()
+Lpwm = Adafruit_PCA9685.PCA9685(0x41)
 
 def set_servo_pulse(channel, pulse):
     pulse_length = 1000000    # 1,000,000 us per second
@@ -24,8 +24,8 @@ def set_servo_pulse(channel, pulse):
     pwm.set_pwm(channel, 0, pulse)
 
 #### Set frequency to 60hz, good for servos.
+Upwm.set_pwm_freq(60)
 Lpwm.set_pwm_freq(60)
-Rpwm.set_pwm_freq(60)
 
 import os
 import pickle
@@ -156,14 +156,14 @@ def cycleServos(n):
     # move from midpoint to max smoothly 225 steps
     for i in range(225):
         for x in range(n):
-            diffL = legs[0][x][2] - legs[0][x][1]
-            diffR = legs[1][x][2] - legs[1][x][1]
-            servoL = int((i/225)*diffL)+ legs[0][x][1]
-            servoR = int((i/225)*diffR)+ legs[1][x][1]
+            diffU = legs[0][x][2] - legs[0][x][1]
+            diffL = legs[1][x][2] - legs[1][x][1]
+            servoU = int((i/225)*diffU)+ legs[0][x][1]
+            servoL = int((i/225)*diffL)+ legs[1][x][1]
+            Upwm.set_pwm(x,0,servoU)
             Lpwm.set_pwm(x,0,servoL)
-            Rpwm.set_pwm(x,0,servoR)
-            servoStat[0][x] = servoL
-            servoStat[1][x] = servoR
+            servoStat[0][x] = servoU
+            servoStat[1][x] = servoL
         time.sleep(.1)
         os.system('clear')
         displayLegs()
@@ -171,14 +171,14 @@ def cycleServos(n):
     # move from max to min smoothly 450 steps
     for i in range(450):
         for x in range(n):
-            diffL = legs[0][x][2] - legs[0][x][0]
-            diffR = legs[1][x][2] - legs[1][x][0]
-            servoL = legs[0][x][2] - int((i/450)*diffL) 
-            servoR = legs[1][x][2] - int((i/450)*diffR)
+            diffU = legs[0][x][2] - legs[0][x][0]
+            diffL = legs[1][x][2] - legs[1][x][0]
+            servoU = legs[0][x][2] - int((i/450)*diffU) 
+            servoL = legs[1][x][2] - int((i/450)*diffL)
+            Upwm.set_pwm(x,0,servoU)
             Lpwm.set_pwm(x,0,servoL)
-            Rpwm.set_pwm(x,0,servoR)
-            servoStat[0][x] = servoL
-            servoStat[1][x] = servoR
+            servoStat[0][x] = servoU
+            servoStat[1][x] = servoL
         time.sleep(.1)
         os.system('clear')
         displayLegs()
@@ -186,14 +186,14 @@ def cycleServos(n):
     # Move from min to mid smoothly 225 steps
     for i in range(225):
         for x in range(n):
-            diffL = legs[0][x][1] - legs[0][x][0]
-            diffR = legs[1][x][1] - legs[1][x][0]
-            servoL = int((i/225)*diffL)+ legs[0][x][0]
-            servoR = int((i/225)*diffR)+ legs[1][x][0]
+            diffU = legs[0][x][1] - legs[0][x][0]
+            diffL = legs[1][x][1] - legs[1][x][0]
+            servoU = int((i/225)*diffU)+ legs[0][x][0]
+            servoL = int((i/225)*diffL)+ legs[1][x][0]
+            Upwm.set_pwm(x,0,servoU)
             Lpwm.set_pwm(x,0,servoL)
-            Rpwm.set_pwm(x,0,servoR)
-            servoStat[0][x] = servoL
-            servoStat[1][x] = servoR
+            servoStat[0][x] = servoU
+            servoStat[1][x] = servoL
         time.sleep(.1)
         os.system('clear')
         displayLegs()
@@ -206,10 +206,10 @@ def writeLegs(d,s,p,a):
 def moveLegs(d,s,p,a):
     global servoStat
     if d == 0:
-        Lpwm.set_pwm(s,0,a)
+        Upwm.set_pwm(s,0,a)
         servoStat[0][s] = a
     elif d == 1:
-        Rpwm.set_pwm(s,0,a)
+        Lpwm.set_pwm(s,0,a)
         servoStat[1][s] = a
 
 # set all servos from legs var p=position, a=amount
@@ -221,9 +221,9 @@ def setAll(p,a):
 def moveAll(p):
     global legs
     for i in range(len(legs[0])):
-        Lpwm.set_pwm(i,0,legs[0][i][p])
+        Upwm.set_pwm(i,0,legs[0][i][p])
         servoStat[0][i] = legs[0][i][p]
-        Rpwm.set_pwm(i,0,legs[1][i][p])
+        Lpwm.set_pwm(i,0,legs[1][i][p])
         servoStat[1][i] = legs[1][i][p]
         
 
@@ -234,8 +234,8 @@ def displayLegs():
 
 def zeroServos():
     for i in range(len(legs[0])):
+        Upwm.set_pwm(i,0,0)
         Lpwm.set_pwm(i,0,0)
-        Rpwm.set_pwm(i,0,0)
         servoStat[0][i] = 0
         servoStat[1][i] = 0
 
@@ -254,7 +254,7 @@ def oneByOne(x): # allows tuning motors one at a time sequentially
             print("Set motor ", i, " on board 0 (left)")
             motor = int(input())
             if motor > 150 and motor < 600:
-                Lpwm.set_pwm(i,0,int(motor))
+                Upwm.set_pwm(i,0,int(motor))
             print("happy with the value?")
             ip = raw_input()
             if ip == "y":
@@ -266,7 +266,7 @@ def oneByOne(x): # allows tuning motors one at a time sequentially
             print("Set motor ", i, " on board 1 (right)")
             motor = int(input())
             if motor > 150 and motor < 600:
-                Rpwm.set_pwm(i,0,int(motor))
+                Lpwm.set_pwm(i,0,int(motor))
             print("happy with the value?")
             ip = raw_input()
             if ip == "y":
